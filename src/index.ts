@@ -29,6 +29,7 @@ interface BlameInfo {
     ruleId: string | null
     message: string
     isWarning: boolean
+    isSuppressed: boolean
     time: string
 }
 
@@ -56,8 +57,8 @@ function assert(v: unknown, message?: string): asserts v {
     }
 }
 
-function filePathWithLineFactory (filePath: string, line: number) {
-    return `${filePath}:${line}`
+function fsFilePathWithLineFactory (fsFilePath: string, line: number) {
+    return `${fsFilePath}:${line}`
 }
 
 function jsonFormatter(infos: BlameInfo[]): string {
@@ -113,40 +114,49 @@ function markdownFormatter(infos: BlameInfo[]) {
 export async function blame (content: string, argv: Omit<Args, 'input' | 'output'>) {
     const results = JSON.parse(content) as ExtraLintResult[];
     const format = argv.format ?? OutputFormat.Json;
-    const includeWarn = argv.warn ?? false;
-    const includeSuppressed = argv.suppressed ?? false;
+    const includesWarn = argv.warn ?? false;
+    const includesSuppressed = argv.suppressed ?? false;
 
     const infos: BlameInfo[] = [];
     for (const result of results) {
-        const filePath = result.filePath;
-        
-        const messages = result.messages.concat(includeSuppressed && result.suppressedMessages || []);
+        const fsFilePath = result.filePath;
 
-        for (const message of messages) {
-            if (message.severity === Severity.Error || includeWarn && message.severity === Severity.Warn) {
-                const filePathWithLine = filePathWithLineFactory(filePath, message.line);
-                const blameResult = await blameLine(filePathWithLine)
+        for (const message of result.messages) {
+            await messageWorker(message, fsFilePath, false);
+        }
 
-                infos.push({
-                    line: message.line,
-                    filePath: blameResult.filename,
-                    author: blameResult.author,
-                    email: blameResult.authorMail,
-                    time: blameResult.authorTime.toString(),
-                    ruleId: message.ruleId,
-                    isWarning: message.severity === Severity.Warn,
-                    message: message.message
-                })
+        if (includesSuppressed && result.suppressedMessages) {
+            for (const message of result.suppressedMessages) {
+                await messageWorker(message, fsFilePath, true);
             }
         }
     }
-    
+
     if (format === OutputFormat.Json) {
         return jsonFormatter(infos)
     }
     else {
         assert(format === OutputFormat.Markdown);
         return markdownFormatter(infos);
+    }
+
+    async function messageWorker (message: eslint.Linter.LintMessage, fsFilePath: string, isSuppressed: boolean) {
+        if (message.severity === Severity.Error || includesWarn && message.severity === Severity.Warn) {
+            const fsFilePathWithLine = fsFilePathWithLineFactory(fsFilePath, message.line);
+            const blameResult = await blameLine(fsFilePathWithLine)
+
+            infos.push({
+                line: message.line,
+                filePath: blameResult.filename,
+                author: blameResult.author,
+                email: blameResult.authorMail,
+                time: blameResult.authorTime.toString(),
+                ruleId: message.ruleId,
+                isWarning: message.severity === Severity.Warn,
+                message: message.message,
+                isSuppressed
+            })
+        }
     }
 }
 

@@ -2,7 +2,9 @@
   "name": "yet-another-eslint-blame",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": "./dist/cli.js",
+  "bin": {
+    "yaeb": "./dist/cli.js"
+  },
   "version": "0.0.1",
   "devDependencies": {
     "@types/eslint": "^8.4.1",
