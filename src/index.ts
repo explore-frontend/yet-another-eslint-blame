@@ -6,6 +6,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { blameLine } from 'git-blame-line';
 
+type ExtraLintResult = eslint.ESLint.LintResult & {
+    suppressedMessages?: eslint.Linter.LintMessage[]
+}
+
 enum OutputFormat {
     Json = 'json',
     Markdown = 'markdown'
@@ -33,6 +37,7 @@ interface Args {
     warn?: boolean
     input?: string
     output?: string
+    suppressed?: boolean;
 }
 
 function isDef<T>(v: T): v is NonNullable<T> {
@@ -106,22 +111,25 @@ function markdownFormatter(infos: BlameInfo[]) {
 }
 
 export async function blame (content: string, argv: Omit<Args, 'input' | 'output'>) {
-    const results = JSON.parse(content) as eslint.ESLint.LintResult[];
+    const results = JSON.parse(content) as ExtraLintResult[];
     const format = argv.format ?? OutputFormat.Json;
     const includeWarn = argv.warn ?? false;
+    const includeSuppressed = argv.suppressed ?? false;
 
     const infos: BlameInfo[] = [];
     for (const result of results) {
         const filePath = result.filePath;
         
-        for (const message of result.messages) {
+        const messages = result.messages.concat(includeSuppressed && result.suppressedMessages || []);
+
+        for (const message of messages) {
             if (message.severity === Severity.Error || includeWarn && message.severity === Severity.Warn) {
                 const filePathWithLine = filePathWithLineFactory(filePath, message.line);
                 const blameResult = await blameLine(filePathWithLine)
 
                 infos.push({
-                    filePath,
                     line: message.line,
+                    filePath: blameResult.filename,
                     author: blameResult.author,
                     email: blameResult.authorMail,
                     time: blameResult.authorTime.toString(),
@@ -132,7 +140,7 @@ export async function blame (content: string, argv: Omit<Args, 'input' | 'output
             }
         }
     }
-
+    
     if (format === OutputFormat.Json) {
         return jsonFormatter(infos)
     }
@@ -179,7 +187,7 @@ export async function main () {
         .strict()
         .command<Args>({
             command: ['$0', inputArg, '[options]'].filter(isDef).join(' '),
-            describe: '',
+            describe: 'Blame everyone from eslint json output.',
             builder: (yargs: yargs.Argv<Args>) => {
                 if (isReadData) {
                     return yargs
@@ -192,7 +200,7 @@ export async function main () {
                 }).epilog('Happy hack')
                 
             },
-            handler: handlerFactory(data),
+            handler: handlerFactory(isReadData ? data : undefined),
         })
         .option('f', {
             alias: 'format',
@@ -212,6 +220,11 @@ export async function main () {
         .option('w', {
             alias: 'warn',
             describe: 'Includes warn message',
+            type: 'boolean'
+        })
+        .option('s', {
+            alias: 'suppressed',
+            describe: 'Includes suppressed message',
             type: 'boolean'
         })
         .version().alias('v', 'version')
