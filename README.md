@@ -18,11 +18,9 @@ pnpm install yet-another-eslint-blame
 
 ### Read eslint json output from file
 
-1. Run `eslint` and output with json:  
-
+1. Run `eslint` and output with json:
     eg: Run `eslint src -f json -o ./a.json`
-2. run `yet-another-eslint-blame`:  
-
+2. run `yet-another-eslint-blame`:
     eg: Run `yaeb ./a.json`
 3. Enjoy!
 
@@ -35,10 +33,14 @@ pnpm install yet-another-eslint-blame
 ### Output with markdown todo list
 
 With `-f markdown`, we will output something like:
-`- [] [<file and line number with the relative path>](./<file and line number with the relative path>) @<author>`.
+
+```markdown
+- [] [<file and line number with the relative path>](./<file and line number with the relative path>) @<author>
+```
+
 It will looks like:
 
-- [ ] [package.json#L2](./package.json#L2) @kingwl  
+- [ ] [package.json#L2](./package.json#L2) @kingwl
 
 You can just copy it into gitlab's merge requests or issues.
 
