@@ -1,14 +1,14 @@
 import type * as eslint from 'eslint';
 import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers'
-import getStdin from 'get-stdin'
+import { hideBin } from 'yargs/helpers';
+import getStdin from 'get-stdin';
 import * as fs from 'fs';
 import * as path from 'path';
 import { blameLine } from 'git-blame-line';
 
 type ExtraLintResult = eslint.ESLint.LintResult & {
-    suppressedMessages?: eslint.Linter.LintMessage[]
-}
+    suppressedMessages?: eslint.Linter.LintMessage[];
+};
 
 enum OutputFormat {
     Json = 'json',
@@ -22,27 +22,27 @@ enum Severity {
 }
 
 interface BlameInfo {
-    filePath: string
-    line: number
-    author: string
-    email: string
-    ruleId: string | null
-    message: string
-    isWarning: boolean
-    isSuppressed: boolean
-    time: string
+    filePath: string;
+    line: number;
+    author: string;
+    email: string;
+    ruleId: string | null;
+    message: string;
+    isWarning: boolean;
+    isSuppressed: boolean;
+    time: string;
 }
 
 interface Args {
-    format?: OutputFormat
-    warn?: boolean
-    input?: string
-    output?: string
+    format?: OutputFormat;
+    warn?: boolean;
+    input?: string;
+    output?: string;
     suppressed?: boolean;
 }
 
 function isDef<T>(v: T): v is NonNullable<T> {
-    return v !== undefined && v !== null
+    return v !== undefined && v !== null;
 }
 
 function assertDef<T>(v: T, message?: string): asserts v is NonNullable<T> {
@@ -53,65 +53,73 @@ function assertDef<T>(v: T, message?: string): asserts v is NonNullable<T> {
 
 function assert(v: unknown, message?: string): asserts v {
     if (!v) {
-        throw new Error(message ?? 'Assert failed')
+        throw new Error(message ?? 'Assert failed');
     }
 }
 
-function fsFilePathWithLineFactory (fsFilePath: string, line: number) {
-    return `${fsFilePath}:${line}`
+function fsFilePathWithLineFactory(fsFilePath: string, line: number) {
+    return `${fsFilePath}:${line}`;
 }
 
 function jsonFormatter(infos: BlameInfo[]): string {
-    return JSON.stringify(infos)
+    return JSON.stringify(infos);
 }
 
-function writeTodoListStatus (done: boolean) {
-    return done ? 'x' : ' '
+function writeTodoListStatus(done: boolean) {
+    return done ? 'x' : ' ';
 }
 
 function writeTodoList(...items: string[]) {
-    return items.join('\n')
+    return items.join('\n');
 }
 
 function writeTodoListItem(status: boolean, content: string) {
-    return `- [${writeTodoListStatus(status)}] ${content}`
+    return `- [${writeTodoListStatus(status)}] ${content}`;
 }
 
 function writeLink(text: string, link: string) {
-    return `[${text}](${link})`
+    return `[${text}](${link})`;
 }
 
 function writeAt(name: string) {
-    return `@${name}`
+    return `@${name}`;
 }
 
-function writeFilePathAndLine (filePath: string, line: number) {
-    return `${filePath}#L${line}`
+function writeFilePathAndLine(filePath: string, line: number) {
+    return `${filePath}#L${line}`;
 }
 
-function writeRelativePath (path: string) {
-    return `./${path}`
+function writeRelativePath(path: string) {
+    return `./${path}`;
 }
 
-function writeContent (...contents: string[]) {
-    return contents.join(' ')
+function writeContent(...contents: string[]) {
+    return contents.join(' ');
 }
 
 function markdownFormatter(infos: BlameInfo[]) {
     return writeTodoList(
         ...infos.map(info => {
-            return writeTodoListItem(false, writeContent(
-                writeLink(
-                    writeFilePathAndLine(info.filePath, info.line),
-                    writeRelativePath(writeFilePathAndLine(info.filePath, info.line))
-                ),
-                writeAt(info.author)
-            ))
+            return writeTodoListItem(
+                false,
+                writeContent(
+                    writeLink(
+                        writeFilePathAndLine(info.filePath, info.line),
+                        writeRelativePath(
+                            writeFilePathAndLine(info.filePath, info.line)
+                        )
+                    ),
+                    writeAt(info.author)
+                )
+            );
         })
-    )
+    );
 }
 
-export async function blame (content: string, argv: Omit<Args, 'input' | 'output'>) {
+export async function blame(
+    content: string,
+    argv: Omit<Args, 'input' | 'output'>
+) {
     const results = JSON.parse(content) as ExtraLintResult[];
     const format = argv.format ?? OutputFormat.Json;
     const includesWarn = argv.warn ?? false;
@@ -133,17 +141,26 @@ export async function blame (content: string, argv: Omit<Args, 'input' | 'output
     }
 
     if (format === OutputFormat.Json) {
-        return jsonFormatter(infos)
-    }
-    else {
+        return jsonFormatter(infos);
+    } else {
         assert(format === OutputFormat.Markdown);
         return markdownFormatter(infos);
     }
 
-    async function messageWorker (message: eslint.Linter.LintMessage, fsFilePath: string, isSuppressed: boolean) {
-        if (message.severity === Severity.Error || includesWarn && message.severity === Severity.Warn) {
-            const fsFilePathWithLine = fsFilePathWithLineFactory(fsFilePath, message.line);
-            const blameResult = await blameLine(fsFilePathWithLine)
+    async function messageWorker(
+        message: eslint.Linter.LintMessage,
+        fsFilePath: string,
+        isSuppressed: boolean
+    ) {
+        if (
+            message.severity === Severity.Error ||
+            (includesWarn && message.severity === Severity.Warn)
+        ) {
+            const fsFilePathWithLine = fsFilePathWithLineFactory(
+                fsFilePath,
+                message.line
+            );
+            const blameResult = await blameLine(fsFilePathWithLine);
 
             infos.push({
                 line: message.line,
@@ -155,13 +172,13 @@ export async function blame (content: string, argv: Omit<Args, 'input' | 'output
                 isWarning: message.severity === Severity.Warn,
                 message: message.message,
                 isSuppressed
-            })
+            });
         }
     }
 }
 
-function handlerFactory (data?: string) {
-    return async function handler (argv: yargs.Arguments<Args>) {
+function handlerFactory(data?: string) {
+    return async function handler(argv: yargs.Arguments<Args>) {
         const content = await getData();
         const result = await blame(content, argv);
         if (argv.output) {
@@ -175,23 +192,23 @@ function handlerFactory (data?: string) {
             console.log(result);
         }
 
-        async function getData () {
+        async function getData() {
             if (isDef(data)) {
-                return data
+                return data;
             }
-            const input = argv.input
+            const input = argv.input;
             assertDef(input);
 
             const buffer = await fs.promises.readFile(input);
-            return buffer.toString()
+            return buffer.toString();
         }
-    }
+    };
 }
 
-export async function main () {
+export async function main() {
     const data = await getStdin();
     const isReadData = !!data.length;
-    const inputArg = !isReadData ? '<input>' : undefined
+    const inputArg = !isReadData ? '<input>' : undefined;
 
     yargs(hideBin(process.argv))
         .strict()
@@ -200,26 +217,24 @@ export async function main () {
             describe: 'Blame everyone from eslint json output.',
             builder: (yargs: yargs.Argv<Args>) => {
                 if (isReadData) {
-                    return yargs
+                    return yargs;
                 }
 
-                return yargs.positional('input', {
-                    describe: 'input file path',
-                    type: 'string',
-                    normalize: true
-                }).epilog('Happy hack')
-                
+                return yargs
+                    .positional('input', {
+                        describe: 'input file path',
+                        type: 'string',
+                        normalize: true
+                    })
+                    .epilog('Happy hack');
             },
-            handler: handlerFactory(isReadData ? data : undefined),
+            handler: handlerFactory(isReadData ? data : undefined)
         })
         .option('f', {
             alias: 'format',
             describe: 'Output format',
             type: 'string',
-            choices: [
-                OutputFormat.Json,
-                OutputFormat.Markdown
-            ]
+            choices: [OutputFormat.Json, OutputFormat.Markdown]
         })
         .option('o', {
             alias: 'output',
@@ -237,7 +252,9 @@ export async function main () {
             describe: 'Includes suppressed message',
             type: 'boolean'
         })
-        .version().alias('v', 'version')
+        .version()
+        .alias('v', 'version')
         .showHelpOnFail(true, 'Specify --help for available options')
-        .help('h').alias('h', 'help').argv
+        .help('h')
+        .alias('h', 'help').argv;
 }

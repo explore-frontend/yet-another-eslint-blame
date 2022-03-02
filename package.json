@@ -12,12 +12,14 @@
     "@types/yargs": "^17.0.8",
     "esbuild": "^0.14.1",
     "eslint": "^8.10.0",
+    "prettier": "^2.5.1",
     "typescript": "^4.5.2"
   },
   "scripts": {
     "build:dts": "tsc",
     "build:bundle": "node ./scripts/build.js",
-    "build": "yarn build:bundle && yarn build:dts"
+    "build": "yarn build:bundle && yarn build:dts",
+    "prettier": "prettier --config ./prettier.config.json --write ./src/**/*.ts"
   },
   "dependencies": {
     "get-stdin": "8",
