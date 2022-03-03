@@ -52,4 +52,6 @@ You can just copy it into gitlab's merge requests or issues.
 | `--output` or `-o`     | `string`           |         | Specify output into a file.          |
 | `--warn` or  `-w`      | `boolean`          | `false`   | Includes warning message.            |
 | `--suppressed` or `-s` | `boolean`          | `false`   | Includes suppressed message.         |
+| `--rule` or `-r` | `string`          |      | Specify a rule Id.         |
+| `--groupby` or `-g` | `rule`          | `rule` | Specify group by what.         |
 

@@ -10,18 +10,22 @@ type ExtraLintResult = eslint.ESLint.LintResult & {
     suppressedMessages?: eslint.Linter.LintMessage[];
 };
 
-enum OutputFormat {
+export enum OutputFormat {
     Json = 'json',
     Markdown = 'markdown'
 }
 
-enum Severity {
+export enum GroupBy {
+    RuleId = 'rule'
+}
+
+export enum Severity {
     Off = 0,
     Warn = 1,
     Error = 2
 }
 
-interface BlameInfo {
+export interface BlameInfo {
     filePath: string;
     line: number;
     author: string;
@@ -33,12 +37,16 @@ interface BlameInfo {
     time: string;
 }
 
-interface Args {
+export type GroupByBlameInfo = Record<string, BlameInfo[]>;
+
+export interface Args {
     format?: OutputFormat;
     warn?: boolean;
     input?: string;
     output?: string;
     suppressed?: boolean;
+    rule?: string;
+    groupby?: GroupBy;
 }
 
 function isDef<T>(v: T): v is NonNullable<T> {
@@ -57,12 +65,12 @@ function assert(v: unknown, message?: string): asserts v {
     }
 }
 
-function fsFilePathWithLineFactory(fsFilePath: string, line: number) {
-    return `${fsFilePath}:${line}`;
+function assertNever(value: unknown, message?: string): never {
+    throw new Error(message ?? 'Should never reach');
 }
 
-function jsonFormatter(infos: BlameInfo[]): string {
-    return JSON.stringify(infos);
+function fsFilePathWithLineFactory(fsFilePath: string, line: number) {
+    return `${fsFilePath}:${line}`;
 }
 
 function writeTodoListStatus(done: boolean) {
@@ -97,6 +105,14 @@ function writeContent(...contents: string[]) {
     return contents.join(' ');
 }
 
+function writeFile(...contents: string[]) {
+    return contents.join('\n');
+}
+
+function writeH4(title: string) {
+    return `#### ${title} ####`;
+}
+
 function markdownFormatter(infos: BlameInfo[]) {
     return writeTodoList(
         ...infos.map(info => {
@@ -116,6 +132,38 @@ function markdownFormatter(infos: BlameInfo[]) {
     );
 }
 
+function groupByMarkdownFormatter(infos: GroupByBlameInfo): string {
+    return writeFile(
+        ...Object.entries(infos)
+            .map(([key, value]) => {
+                return [writeH4(key), markdownFormatter(value)];
+            })
+            .flat()
+    );
+}
+
+function jsonFormatter(infos: BlameInfo[]): string {
+    return JSON.stringify(infos);
+}
+
+function groupByJsonFormatter(infos: GroupByBlameInfo): string {
+    return JSON.stringify(infos);
+}
+
+function groupByInfo(groupBy: GroupBy, infos: BlameInfo[]): GroupByBlameInfo {
+    if (groupBy === GroupBy.RuleId) {
+        const resutls: GroupByBlameInfo = {};
+        infos.forEach(info => {
+            const ruleId = info.ruleId ?? 'Unknown Rule';
+            const list = resutls[ruleId] ?? [];
+            list.push(info);
+            resutls[ruleId] = list;
+        });
+        return resutls;
+    }
+    assertNever(groupBy);
+}
+
 export async function blame(
     content: string,
     argv: Omit<Args, 'input' | 'output'>
@@ -124,6 +172,8 @@ export async function blame(
     const format = argv.format ?? OutputFormat.Json;
     const includesWarn = argv.warn ?? false;
     const includesSuppressed = argv.suppressed ?? false;
+    const rule = argv.rule;
+    const groupBy = argv.groupby;
 
     const infos: BlameInfo[] = [];
     for (const result of results) {
@@ -140,9 +190,19 @@ export async function blame(
         }
     }
 
-    if (format === OutputFormat.Json) {
-        return jsonFormatter(infos);
+    if (groupBy) {
+        const results = groupByInfo(groupBy, infos);
+        if (format === OutputFormat.Json) {
+            return groupByJsonFormatter(results);
+        }
+
+        assert(format === OutputFormat.Markdown);
+        return groupByMarkdownFormatter(results);
     } else {
+        if (format === OutputFormat.Json) {
+            return jsonFormatter(infos);
+        }
+
         assert(format === OutputFormat.Markdown);
         return markdownFormatter(infos);
     }
@@ -153,27 +213,32 @@ export async function blame(
         isSuppressed: boolean
     ) {
         if (
-            message.severity === Severity.Error ||
-            (includesWarn && message.severity === Severity.Warn)
+            message.severity !== Severity.Error &&
+            !(includesWarn && message.severity === Severity.Warn)
         ) {
-            const fsFilePathWithLine = fsFilePathWithLineFactory(
-                fsFilePath,
-                message.line
-            );
-            const blameResult = await blameLine(fsFilePathWithLine);
-
-            infos.push({
-                line: message.line,
-                filePath: blameResult.filename,
-                author: blameResult.author,
-                email: blameResult.authorMail,
-                time: blameResult.authorTime.toString(),
-                ruleId: message.ruleId,
-                isWarning: message.severity === Severity.Warn,
-                message: message.message,
-                isSuppressed
-            });
+            return;
         }
+        if (isDef(rule) && message.ruleId !== rule) {
+            return;
+        }
+
+        const fsFilePathWithLine = fsFilePathWithLineFactory(
+            fsFilePath,
+            message.line
+        );
+        const blameResult = await blameLine(fsFilePathWithLine);
+
+        infos.push({
+            line: message.line,
+            filePath: blameResult.filename,
+            author: blameResult.author,
+            email: blameResult.authorMail,
+            time: blameResult.authorTime.toString(),
+            ruleId: message.ruleId,
+            isWarning: message.severity === Severity.Warn,
+            message: message.message,
+            isSuppressed
+        });
     }
 }
 
@@ -251,6 +316,18 @@ export async function main() {
             alias: 'suppressed',
             describe: 'Includes suppressed message',
             type: 'boolean'
+        })
+        .option('r', {
+            alias: 'rule',
+            describe: 'Specify a rule id',
+            type: 'string'
+        })
+        .option('g', {
+            alias: 'groupby',
+            describe: 'Group results by',
+            type: 'string',
+            choices: [GroupBy.RuleId],
+            default: GroupBy.RuleId
         })
         .version()
         .alias('v', 'version')
