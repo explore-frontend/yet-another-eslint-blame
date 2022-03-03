@@ -5,7 +5,8 @@
   "bin": {
     "yaeb": "./dist/cli.js"
   },
-  "version": "0.0.2",
+  "version": "0.0.3",
+  "repository": "https://github.com/kwai-explore/yet-another-eslint-blame",
   "devDependencies": {
     "@types/eslint": "^8.4.1",
     "@types/node": "^17.0.21",

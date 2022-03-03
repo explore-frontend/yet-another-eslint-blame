@@ -18,15 +18,15 @@ pnpm install yet-another-eslint-blame
 
 ### Read eslint json output from file
 
-1. Run `eslint` and output with json:
+1. Run `eslint` and output with json:  
     eg: Run `eslint src -f json -o ./a.json`
-2. run `yet-another-eslint-blame`:
+2. run `yet-another-eslint-blame`:  
     eg: Run `yaeb ./a.json`
 3. Enjoy!
 
 ### Read eslint json output with stdin
 
-1. Run `eslint` and output with json, and pipe into `yet-another-eslint-blame`:
+1. Run `eslint` and output with json, and pipe into `yet-another-eslint-blame`:  
     eg: Run `eslint src -f json | yaeb`
 2. Enjoy!
 
